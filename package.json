@@ -1,6 +1,18 @@
 {
+  "name": "employee-tracker",
+  "version": "1.0.0",
+  "description": "Command line application that allows you to mange employees, departments, and roles.",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "main": "index.js",
   "dependencies": {
+    "dotenv": "^16.3.1",
     "inquirer": "^8.2.4",
-    "nodemon": "^3.0.1"
+    "mysql2": "^3.5.1",
+    "nodemon": "^3.0.1",
+    "sequelize": "^6.32.1"
   }
 }
+

@@ -7,9 +7,12 @@ const {
   addRole,
   addEmployee,
   updateEmployeeRole,
-} = require('./controllers/actions');
+} = require('./controllers/actions.js');
+
 
 function startApp() {
+  console.log('Application started.');
+
   inquirer
     .prompt({
       name: 'action',

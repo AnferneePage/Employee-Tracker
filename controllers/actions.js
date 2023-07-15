@@ -1,11 +1,8 @@
-const db = require('../config/db');
 const inquirer = require('inquirer');
-const Department = require('../db/schemas/department');
-const Role = require('../db/schemas/role');
-const Employee = require('../db/schemas/employee');
+const db = require('../config/connections');
 
 function viewAllDepartments() {
-  db.query('SELECT * FROM departments', (err, rows) => {
+  db.query('SELECT department_name, id FROM department', (err, rows) => {
     if (err) {
       console.error('An error occurred while viewing all departments:', err);
       return;
@@ -13,7 +10,7 @@ function viewAllDepartments() {
 
     console.log('All Departments:');
     rows.forEach((department) => {
-      console.log(`- Department Name: ${department.name}`);
+      console.log(`- Department Name: ${department.department_name}`);
       console.log(`  Department ID: ${department.id}`);
       console.log('---------------------');
     });
@@ -21,7 +18,7 @@ function viewAllDepartments() {
 }
 
 function viewAllRoles() {
-  db.query('SELECT * FROM roles', (err, rows) => {
+  db.query('SELECT role_title, role.id, department.department_name, salary FROM role JOIN department ON role.department_id = department.id', (err, rows) => {
     if (err) {
       console.error('An error occurred while viewing all roles:', err);
       return;
@@ -29,9 +26,9 @@ function viewAllRoles() {
 
     console.log('All Roles:');
     rows.forEach((role) => {
-      console.log(`- Title: ${role.title}`);
+      console.log(`- Title: ${role.role_title}`);
       console.log(`  Role ID: ${role.id}`);
-      console.log(`  Department: ${role.department}`);
+      console.log(`  Department: ${role.department_name}`);
       console.log(`  Salary: ${role.salary}`);
       console.log('---------------------');
     });
@@ -39,7 +36,7 @@ function viewAllRoles() {
 }
 
 function viewAllEmployees() {
-  db.query('SELECT * FROM employees', (err, rows) => {
+  db.query('SELECT employee.id, first_name, last_name, role.role_title, department.department_name, salary, CONCAT(manager.first_name, " ", manager.last_name) AS manager_name FROM employee JOIN role ON employee.role_id = role.id JOIN department ON role.department_id = department.id LEFT JOIN employee AS manager ON employee.manager_id = manager.id', (err, rows) => {
     if (err) {
       console.error('An error occurred while viewing all employees:', err);
       return;
@@ -47,12 +44,12 @@ function viewAllEmployees() {
 
     console.log('All Employees:');
     rows.forEach((employee) => {
-      console.log(`  Name: ${employee.firstName} ${employee.lastName}`);
+      console.log(`  Name: ${employee.first_name} ${employee.last_name}`);
       console.log(`  Employee ID: ${employee.id}`);
-      console.log(`  Job title: ${employee.title}`);
-      console.log(`  Department: ${employee.department}`);
+      console.log(`  Job title: ${employee.role_title}`);
+      console.log(`  Department: ${employee.department_name}`);
       console.log(`  Salary: ${employee.salary}`);
-      console.log(`  Manager Name: ${employee.managerFirstName} ${employee.managerLastName}`);
+      console.log(`  Manager Name: ${employee.manager_name}`);
       console.log('---------------------');
     });
   });
@@ -67,7 +64,7 @@ function addDepartment() {
     })
     .then((answers) => {
       const { departmentName } = answers;
-      db.query('INSERT INTO departments (name) VALUES (?)', [departmentName], (err, result) => {
+      db.query('INSERT INTO department (department_name) VALUES (?)', [departmentName], (err, result) => {
         if (err) {
           console.error('An error occurred while adding a department:', err);
           return;
@@ -79,168 +76,114 @@ function addDepartment() {
 }
 
 function addRole() {
-  Department.findAll()
-    .then((departments) => {
-      inquirer
-        .prompt([
-          {
-            name: 'title',
-            type: 'input',
-            message: 'Enter the title of the role:',
-          },
-          {
-            name: 'salary',
-            type: 'input',
-            message: 'Enter the salary for the role:',
-            validate: function (value) {
-              const valid = !isNaN(parseFloat(value)) && parseFloat(value) >= 0;
-              return valid || 'Please enter a positive number';
-            },
-          },
-          {
-            name: 'departmentId',
-            type: 'list',
-            message: 'Select the department for the role:',
-            choices: departments.map((department) => ({
-              name: department.name,
-              value: department.id,
-            })),
-          },
-        ])
-        .then((answers) => {
-          const { title, salary, departmentId } = answers;
-          db.query(
-            'INSERT INTO roles (title, salary, departmentId) VALUES (?, ?, ?)',
-            [title, salary, departmentId],
-            (err, result) => {
-              if (err) {
-                console.error('An error occurred while adding a role:', err);
-                return;
-              }
+  inquirer
+    .prompt([
+      {
+        name: 'title',
+        type: 'input',
+        message: 'Enter the title of the role:',
+      },
+      {
+        name: 'salary',
+        type: 'input',
+        message: 'Enter the salary for the role:',
+        validate: function (value) {
+          const valid = !isNaN(parseFloat(value)) && parseFloat(value) >= 0;
+          return valid || 'Please enter a positive number';
+        },
+      },
+      {
+        name: 'departmentId',
+        type: 'input',
+        message: 'Enter the department ID for the role:',
+      },
+    ])
+    .then((answers) => {
+      const { title, salary, departmentId } = answers;
+      db.query(
+        'INSERT INTO role (role_title, salary, department_id) VALUES (?, ?, ?)',
+        [title, salary, departmentId],
+        (err, result) => {
+          if (err) {
+            console.error('An error occurred while adding a role:', err);
+            return;
+          }
 
-              console.log(`Successfully added role: ${title} (ID: ${result.insertId})`);
-            }
-          );
-        });
-    })
-    .catch((err) => {
-      console.error('An error occurred while fetching departments:', err);
+          console.log(`Successfully added role: ${title} (ID: ${result.insertId})`);
+        }
+      );
     });
 }
 
 function addEmployee() {
-  Role.findAll()
-    .then((roles) => {
-      inquirer
-        .prompt([
-          {
-            name: 'firstName',
-            type: 'input',
-            message: "Enter the employee's first name:",
-          },
-          {
-            name: 'lastName',
-            type: 'input',
-            message: "Enter the employee's last name:",
-          },
-          {
-            name: 'roleId',
-            type: 'list',
-            message: "Select the employee's role:",
-            choices: roles.map((role) => ({
-              name: role.title,
-              value: role.id,
-            })),
-          },
-          {
-            name: 'managerId',
-            type: 'input',
-            message: "Enter the employee's manager ID:",
-            validate: function (value) {
-              const valid = !isNaN(parseInt(value)) && parseInt(value) >= 0;
-              return valid || 'Please enter a positive number';
-            },
-          },
-        ])
-        .then((answers) => {
-          const { firstName, lastName, roleId, managerId } = answers;
-          db.query(
-            'INSERT INTO employees (firstName, lastName, roleId, managerId) VALUES (?, ?, ?, ?)',
-            [firstName, lastName, roleId, managerId],
-            (err, result) => {
-              if (err){
-                console.error('An error occurred while adding an employee:', err);
-                return;
-              }
+  inquirer
+    .prompt([
+      {
+        name: 'firstName',
+        type: 'input',
+        message: "Enter the employee's first name:",
+      },
+      {
+        name: 'lastName',
+        type: 'input',
+        message: "Enter the employee's last name:",
+      },
+      {
+        name: 'roleId',
+        type: 'input',
+        message: "Enter the role ID for the employee:",
+      },
+      {
+        name: 'managerId',
+        type: 'input',
+        message: "Enter the manager ID for the employee:",
+      },
+    ])
+    .then((answers) => {
+      const { firstName, lastName, roleId, managerId } = answers;
+      db.query(
+        'INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES (?, ?, ?, ?)',
+        [firstName, lastName, roleId, managerId],
+        (err, result) => {
+          if (err) {
+            console.error('An error occurred while adding an employee:', err);
+            return;
+          }
 
-              console.log(
-                `Successfully added employee: ${firstName} ${lastName} (ID: ${result.insertId})`
-              );
-            }
-          );
-        });
-    })
-    .catch((err) => {
-      console.error('An error occurred while fetching roles:', err);
+          console.log(`Successfully added employee: ${firstName} ${lastName} (ID: ${result.insertId})`);
+        }
+      );
     });
 }
 
 function updateEmployeeRole() {
-  Employee.findAll()
-    .then((employees) => {
-      const employeeChoices = employees.map((employee) => ({
-        name: `${employee.firstName} ${employee.lastName}`,
-        value: employee.id,
-      }));
+  inquirer
+    .prompt([
+      {
+        name: 'employeeId',
+        type: 'input',
+        message: 'Enter the ID of the employee to update:',
+      },
+      {
+        name: 'roleId',
+        type: 'input',
+        message: 'Enter the new role ID for the employee:',
+      },
+    ])
+    .then((answers) => {
+      const { employeeId, roleId } = answers;
+      db.query(
+        'UPDATE employee SET role_id = ? WHERE id = ?',
+        [roleId, employeeId],
+        (err, result) => {
+          if (err) {
+            console.error('An error occurred while updating an employee role:', err);
+            return;
+          }
 
-      inquirer
-        .prompt({
-          name: 'employeeId',
-          type: 'list',
-          message: 'Select the employee to update:',
-          choices: employeeChoices,
-        })
-        .then((answers) => {
-          const { employeeId } = answers;
-          Employee.findByPk(employeeId)
-            .then((selectedEmployee) => {
-              Role.findAll()
-                .then((roles) => {
-                  const roleChoices = roles.map((role) => ({
-                    name: role.title,
-                    value: role.id,
-                  }));
-
-                  inquirer
-                    .prompt({
-                      name: 'roleId',
-                      type: 'list',
-                      message: 'Select the new role for the employee:',
-                      choices: roleChoices,
-                    })
-                    .then((answers) => {
-                      const { roleId } = answers;
-                      selectedEmployee
-                        .update({ roleId })
-                        .then(() => {
-                          console.log(`Successfully updated employee's role.`);
-                        })
-                        .catch((err) => {
-                          console.error('An error occurred while updating an employee role:', err);
-                        });
-                    });
-                })
-                .catch((err) => {
-                  console.error('An error occurred while fetching roles:', err);
-                });
-            })
-            .catch((err) => {
-              console.error('An error occurred while fetching the selected employee:', err);
-            });
-        });
-    })
-    .catch((err) => {
-      console.error('An error occurred while fetching employees:', err);
+          console.log(`Successfully updated employee's role.`);
+        }
+      );
     });
 }
 
